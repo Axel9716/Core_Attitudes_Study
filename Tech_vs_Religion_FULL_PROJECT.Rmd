@@ -1,0 +1,161 @@
+---
+title: "The Effects of Scientific Development of Religious Participation"
+author: "Alex Ptacek"
+output:
+  pdf_document: default
+  html_document: default
+editor_options:
+  chunk_output_type: console
+---
+
+# Abstract
+
+Over the last century, our civilization (especially in developed nations) has experienced a technological revolution of unprecedented speed, which increasingly permeates our everyday life. The growth of the media industry, both social and traditional, has increased the value of material goods, and relentless strides in the fields of science have given us insight into our nature and the workings of the universe. In a similar period of time, the U.S. has also experienced a tremendous decline in religious participation, based on a Gallup report. In this report, I use survey response data from the World Value Survey (WVS) to examine the relationship between approval of science and technology and affiliation with religion. I use two questions from the WVS data as a proxy for these questions. The questions effectively ask: "If developments in science/technology change our way of life, would that be good or bad?" and "Do you consider yourself religious". The null hypothesis for the analysis is that approval of scientific development does not have an effect on the proportion of people who identify as religious. The alternative hypothesis is that scientific development DOES have an effect on the religious identity proportion. The significance level for this hypothesis is 0.05. To conduct the test, I first calculated the observed statistic, then used the `infer` package to generate a sampling distribution of two proportions as our null distribution. Lastly, I have calculated the p-value to be 0.036, which is less than our significance level, so we reject the null hypothesis. This means that if we take more samples of the U.S. population, we can expect that samples with higher proportion of science approval will have lower proportion of religious affiliation than those with lower science approval.
+
+# Load Packages
+
+```{r message=FALSE}
+library(tidyverse)
+library(stats)
+library(ggpubr)
+library(infer)
+```
+
+# Read Data
+
+```{r message=FALSE}
+wvs_survey <- read_csv("wvs_survey.csv")
+
+#Checking for null values in country column
+wvs_survey |> 
+  filter(is.na(B_COUNTRY))
+```
+
+# Clean Data
+
+```{r}
+#Minimize dataset so it's faster
+us_sci_religion <- wvs_survey |>     
+  filter(B_COUNTRY == 840) |>        #U.S. country code
+  select(Q44, Q173) |> 
+  rename(science = Q44,              #proxy for science approval
+         religion = Q173)            #proxy for religious affiliation
+
+#Observe values in science column
+us_sci_religion |> 
+  count(science)
+
+#Observe values in religion column
+us_sci_religion |> 
+  count(religion)
+
+#Recode neutral and null responses to NA
+us_sci_religion <- us_sci_religion |> 
+  mutate(science = as.character(science),
+         science = case_when(science == -2 ~ NA,
+                             science == -1 ~ NA,
+                             science == 1 ~ "good",
+                             science == 2 ~ NA,
+                             science == 3 ~ "bad",
+                             .default = science),
+         religion = as.character(religion),
+         religion = case_when(religion == -2 ~ NA,
+                              religion ==1 ~ "yes",
+                              religion == 2 ~ "no",
+                              religion == 3 ~ "no",
+                              .default = religion))
+```
+
+# Summary Statistics
+
+Within our science variable we can a huge skew in approval in favor of science development being "good". Within the religion variable, the proportion seems close to what was reported by Gallop (47%).
+
+```{r}
+#Compute a proportion table grouped by science
+us_sci_religion |> 
+  drop_na(science, religion) |> 
+  group_by(science, religion) |> 
+  count() |> 
+  ungroup() |> 
+  mutate(science_sum = n + lag(n, 1),
+         science_group_sum = case_when(is.na(science_sum) ~ 158,
+                                 science_sum == 779 ~ 1417,
+                                 .default = science_sum),
+         prop_science = round(n/science_sum, 2)) |> 
+  select(1:3, 5)
+
+#Distribution of responses for science
+science_bar <- us_sci_religion |> 
+  drop_na(science) |> 
+  ggplot(aes(x = science)) +
+  geom_bar()
+
+#Distribution of responses for religion
+religion_bar <- us_sci_religion |> 
+  drop_na(religion) |> 
+  ggplot(aes(x = religion)) +
+  geom_bar()
+
+ggarrange(science_bar, religion_bar)
+```
+
+# Hypothesis Test
+
+### Conditions for the Sampling Distribution of Two Proportions
+
+In order to validate the use of a sampling distribution of two proportions, our variables must meet two conditions: independence within and between groups and the success-failure condition. Since this survey was a simple, random sample, independence is met. To satisfy the success-failure condition, we must find the np and n(1-p) to be greater than 10 within all groups. All groups satisfy this condition.
+
+```{r}
+set.seed(606)
+
+#science bad, not religious
+62*.39
+
+#science bad, yes religious
+96*.61
+
+#science good, not religious
+683*.48
+
+#science good, yes religious
+734*.52
+
+```
+
+### Testing the Difference of Two Proportions
+
+In this section, we run a test to see if there's a statistically significant difference in the proportions of religious people in the science approval and disapproval groups. We can see in the visualization that our observed statistic is in the outskirts of the null distribution. Our p-value is 0.036, so we reject our null hypothesis.
+
+```{r message=FALSE}
+#Calculate difference in proportions
+#science bad & yes religious vs science good and yes religious
+0.61-0.52
+
+#Calculate Observed Statistic
+p_hat <- us_sci_religion |>  
+  drop_na(science, religion) |> 
+  specify(religion ~ science, success = "yes") |> 
+  calculate(stat = "diff in props", order = c("good", "bad"))
+
+#Generate null distribution
+null_dist <- us_sci_religion %>%
+  drop_na(science, religion) |> 
+  specify(religion ~ science, success = "yes") %>%
+  hypothesize(null = "independence") %>% 
+  generate(reps = 1000) %>% 
+  calculate(stat = "diff in props", order = c("good", "bad"))
+
+visualize(null_dist) +
+  shade_p_value(obs_stat = p_hat, direction = "two-sided")
+
+#Get p-value for test
+null_dist |> 
+  get_p_value(obs_stat = p_hat, direction = "two-sided")
+
+```
+
+# References
+
+Jones, Jeffery. “U.S. Church Membership Falls below Majority for First Time.” Gallup, 29 Mar. 2021, news.gallup.com/poll/341963/church-membership-falls-below-majority-first-time.aspx.
+
+Diez, David, et al. OpenIntro Statistics. Fourth ed., OpenIntro, 8 June 2019.
