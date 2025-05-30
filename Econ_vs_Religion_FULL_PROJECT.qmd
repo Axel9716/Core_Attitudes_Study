@@ -1,0 +1,271 @@
+---
+title: "The Exploration of Human Opinion as a Byproduct of Circumstance"
+author: "Alex Ptacek"
+format: pdf
+editor: visual
+editor_options: 
+  chunk_output_type: console
+---
+
+# Abstract
+
+In this report, I use survey response data from the World Value Survey (WVS) and Pew Research Center's National Public Opinion Reference Survey (NPORS) to examine the relationship between economic outlook and affiliation with religion in the U.S. I use two questions from each dataset as a proxy for these questions. The questions effectively ask: "How do you rate the economy" and "Do you identify as religious". The null hypothesis for the analysis is that economic outlook does not have an effect on the proportion of people who identify as religious. The alternative hypothesis is that economic outlook DOES have an effect on the religious identity proportion. The significance level for this hypothesis is 0.05. To conduct the test, I first calculated the observed statistic, then used the `infer` package to generate a sampling distribution of two proportions as our null distribution. Within the WVS data, I have calculated the p-value to be 0.986, which is higher than our significance level, so we fail to reject the null hypothesis. This means that if we take more samples of the U.S. population, we can expect that religious identity will be independent of economic outlook. However, a similar test with the NPORS data reveals a statistically significant difference in religious identity proportions between groups of positive and negative economic outlooks. This means that either the WVS and NPORS samples are significantly different or the wording in the questions used were significantly different. In order to better understand this difference between the samples, we need to take more samples further analyze the relationship between economic outlook and religious identity, and we can also adjust the questioning so they more closely match.
+
+# Introduction
+
+The motivation for the project comes from an interest in the decline rates of religious participation in the U.S. The U.S. has experienced a tremendous decline in religious participation, from 73% in 1973 to 47% in 2020, based on a Gallup report. I chose the WVS and NPORs surveys because these were conducted by huge research organizations with large enough sample sizes for the desired analysis, and the breadth of question topics is also wide-ranging. My approach to analyzing the data was make it easier to work with, examine the descriptive statistics, then apply the appropriate model. To make the data easier to work with, I categorized many of the questions, reencoded null values, selected the variables of interest, and dichotomized our key variables. The exploratory data analysis provided insight into the distribution of our key variables and helped with the recoding. Since the goal is to assess the statistical significance of any difference in the proportions of two groups, it makes sense to use a 2-proportion z-test.
+
+**Load Packages**
+
+```{r message=FALSE}
+library(tidyverse)
+library(janitor)
+library(foreign)
+library(GGally)
+library(ggpubr)
+library(infer)
+```
+
+# Data Cleaning
+
+In this section, I load the WVS survey data. I also select a range of questions and add category names to them based on the questionnaire guide on the WVS website. I confirmed there were no null values, becuase for every variables there either shouldn't be null values or they are encoded as negative numbers. Lastly, I recode the negative values for the questions as NA, so the data will be easier to work with later on.
+
+```{r message=FALSE}
+wvs_survey <- read_csv("wvs_survey.csv") |> 
+  clean_names()
+
+wvs_data <- wvs_survey |> 
+  select(a_year, b_country, b_country_alpha, j_intdate, k_time_start, k_time_end,
+         q_mode, g_townsize, h_settlement, h_urbrural,
+         e1_literacy, q1:q50, q158:q163, q164:q175, q260:q290) |> 
+  rename_with(~str_c(., "_social"), q1:q50) |> 
+  rename_with(~str_c(., "_sci_tech"), q158:q163) |>
+  rename_with(~str_c(., "_religion"), q164:q175) |>
+  rename_with(~str_c(., "_demographic"), q260:q290)
+
+wvs_data |> 
+  filter(if_any(everything(), is.na)) |> 
+  count()
+
+wvs_data <- wvs_data |> 
+  mutate(across(4:126, \(x) ifelse(x < 0, NA, x)))
+
+```
+
+# Data Tidying
+
+### Part 1: WVS
+
+In this section, I narrow the WVS data further, only collecting the variables that will be analyzed, in preparation for the test. I filtered the WVS data to just include U.S, which is the focus of this study. After checking all distinct values of our key variables, I recoded them to be dichotomized.
+
+```{r}
+us_econ_religion <- wvs_data |>     
+  filter(b_country == 840) |>             #U.S. country code
+  select(q50_social, q173_religion) |> 
+  rename(econ_outlook = q50_social,       #proxy for science approval
+         religion = q173_religion)       #proxy for religious affiliation
+
+
+us_econ_religion |> 
+  count(econ_outlook)
+
+
+us_econ_religion |> 
+  count(religion)
+
+us_econ_religion <- us_econ_religion |> 
+  mutate(econ_outlook = case_when(econ_outlook > 5 ~ "positive",
+                                  econ_outlook < 5 ~ "negative",
+                                  econ_outlook == 5 ~ NA,
+                             .default = as.character(econ_outlook)),
+         religion = case_when(religion == -2 ~ NA,
+                              religion ==1 ~ "yes",
+                              religion == 2 ~ "no",
+                              religion == 3 ~ "no",
+                              .default = as.character(religion)))
+```
+
+### Part 2: NPORS
+
+After working the WVS data, I know what to do with the NPORS data. So, I load it in here. Similar to what I did with the WVS data, I first check the disctinct values of our key variables, then recode them to be dichotomized.
+
+```{r message=FALSE, warning=FALSE}
+npors <- read.spss("~/607_project/Pew-Research-Center-Global-Attitudes-Spring-2023-Survey-Data-Public/NPORS-2024-Data-Release/data_npors.sav", to.data.frame = TRUE) |> 
+  clean_names()
+
+npors |>
+  group_by(religcat1) |> 
+  count()
+
+npors |>
+  group_by(econ1mod) |> 
+  count()
+
+npors_data <- npors |> 
+  select(econ1mod, religcat1) |> 
+  rename(econ = econ1mod,
+         religion = religcat1) |> 
+  mutate(econ = case_when(econ == "Excellent" ~ "positive",
+                          econ == "Good" ~ "positive",
+                          econ == "Poor" ~ "negative",
+                          .default = NA),
+         religion = case_when(religion == "Unaffiliated" ~ "no",
+                              religion == "Refused" ~ NA,
+                              .default = "yes"))
+
+```
+
+# Exploratory Data Analysis
+
+### Part 1: WVS
+
+For the exploratory Data Analysis, I created a proportion table and visualizaiton of the distribution of responses for each variable. The first thing I noticed is that the proportion of people who identify as religious is the same within each `econ` group to two decimal places. Within our religion variable, the proportions of religious vs. not religious is somewhat close. However, within our econ variable, the amount of people who have a positive outlook on the economy is almost twice the amount of people with a negative outlook.
+
+```{r}
+#Compute a proportion table grouped by econ_outlook
+us_econ_religion |> 
+  drop_na(econ_outlook, religion) |> 
+  group_by(econ_outlook, religion) |> 
+  count() |> 
+  ungroup() |> 
+  mutate(econ_sum = n + lag(n, 1),
+         econ_group_sum = case_when(is.na(econ_sum) ~ 787,
+                                 econ_sum == 1073 ~ 1418,
+                                 .default = econ_sum),
+         prop_econ = round(n/econ_group_sum, 2)) |> 
+  select(1:3, 5, 6)
+
+econ_bar <- us_econ_religion |> 
+  drop_na(econ_outlook) |> 
+  ggplot(aes(x = econ_outlook)) +
+  geom_bar()
+
+religion_bar <- us_econ_religion |> 
+  drop_na(religion) |> 
+  ggplot(aes(x = religion)) +
+  geom_bar()
+
+ggarrange(econ_bar, religion_bar)
+```
+
+### Part 2: NPORS
+
+Within the NPORS data, there are a few key differences. First, the proportion of the religious variable is much more skewed towards "yes", but the econ proportion is similar. Within our proportion table, people who have a positive econ outlook are less likely to identify as religious as those with a negative outlook. However, the difference in the proportions is small.
+
+```{r}
+npors_data |> 
+  drop_na(econ, religion) |> 
+  group_by(econ, religion) |> 
+  count() |> 
+  ungroup() |> 
+  mutate(econ_sum = n + lag(n, 1),
+         econ_group_sum = case_when(is.na(econ_sum) ~ 1081,
+                                 econ_sum == 1485 ~ 2318,
+                                 .default = econ_sum),
+         prop_econ = round(n/econ_group_sum, 2)) |> 
+  select(1:3, 5, 6)
+
+econ_bar_npors <- npors_data |> 
+  drop_na(econ) |> 
+  ggplot(aes(x = econ)) +
+  geom_bar()
+
+religion_bar_npors <- npors_data |> 
+  drop_na(religion) |> 
+  ggplot(aes(x = religion)) +
+  geom_bar()
+
+ggarrange(econ_bar_npors, religion_bar_npors)
+```
+
+# Hypotheses generated
+
+Based on my exploratory data analysis, my hypothesis is that I will first find the difference in proportions within the WVS data to be not significant, because the proportions are the same to two decimal places. Then I think will find the same in the NPORS data, because the difference in proportions is also small and both datasets contain simple, random samples from the U.S. population. The null hypothesis for the analysis is that economic outlook does not have an effect on the proportion of people who identify as religious. The alternative hypothesis is that economic outlook DOES have an effect on the religious identity proportion.
+
+# Data Analysis
+
+### Part 1: Model Validation
+
+In order to validate the use of a sampling distribution of two proportions, our variables must meet two conditions: independence within and between groups and the success-failure condition. Since both surveys were a simple, random sample, independence is met. To satisfy the success-failure condition, we must find the np and n(1-p) to be greater than 10 within all groups. After testing the success-failure condition within WVS (below) and finding that all the groups satisfy this condition, I could tell be eye that the NPORS groups also satisfied this condition.
+
+```{r}
+set.seed(607)
+
+#econ negative, not religious
+360*.46
+
+#econ negative, yes religious
+427*.54
+
+#econ positive, not religious
+646*.46
+
+#econ postive, yes religious
+772*.54
+```
+
+### Part 2: WVS Model
+
+In this section, we run a test to see if there's a statistically significant difference in the proportions of religious people in the positive and negative economic outlook groups. We can see in the visualization that our observed statistic is right in the thick of the null distribution. Our p-value is 0.986, which is much greater than our significance level, so we fail to reject our null hypothesis.
+
+```{r message=FALSE}
+#Calculate Observed Statistic
+p_hat <- us_econ_religion |>  
+  drop_na(econ_outlook, religion) |> 
+  specify(religion ~ econ_outlook, success = "yes") |> 
+  calculate(stat = "diff in props", order = c("positive", "negative"))
+
+#Generate null distribution
+null_dist <- us_econ_religion %>%
+  drop_na(econ_outlook, religion) |> 
+  specify(religion ~ econ_outlook, success = "yes") %>%
+  hypothesize(null = "independence") %>% 
+  generate(reps = 1000) %>% 
+  calculate(stat = "diff in props", order = c("positive", "negative"))
+
+visualize(null_dist) +
+  shade_p_value(obs_stat = p_hat, direction = "two-sided")
+
+#Get p-value for test
+null_dist |> 
+  get_p_value(obs_stat = p_hat, direction = "two-sided")
+
+```
+
+### Part 3: NPORS Model
+
+Within the NPORS data, we can see in the visualization that our observed statistic is on the outskirts of the null distribution. Our p-value is 0.008, which is less than our significance level, so we reject our null hypothesis.
+
+```{r message=FALSE}
+#Calculate Observed Statistic
+p_hat_npors <- npors_data |>  
+  drop_na(econ, religion) |> 
+  specify(religion ~ econ, success = "yes") |> 
+  calculate(stat = "diff in props", order = c("positive", "negative"))
+
+#Generate null distribution
+null_dist_npors <- npors_data %>%
+  drop_na(econ, religion) |> 
+  specify(religion ~ econ, success = "yes") %>%
+  hypothesize(null = "independence") %>% 
+  generate(reps = 1000) %>% 
+  calculate(stat = "diff in props", order = c("positive", "negative"))
+
+visualize(null_dist_npors) +
+  shade_p_value(obs_stat = p_hat_npors, direction = "two-sided")
+
+#Get p-value for test
+null_dist_npors |> 
+  get_p_value(obs_stat = p_hat_npors, direction = "two-sided")
+
+```
+
+# Conclusion
+
+The results of this test give us some new questions. These samples are simple, random samples of the U.S. population, so we'd expect the same answer to our null hypothesis for both tests. However, this is not the case. Instead, the results suggest that there is another factor that is making the response proportions for this question significantly different. One possibility is that the wording of the questions is significantly different between the two surveys. Comparing them myself, I felt that they were similar enough, but there could be a psychological or syntactic experiment to further explore how the difference in wording affected the proportions. Another possibility is that the samples taken were simply, significantly different. The way to rectify this would be by collecting more simple, random samples of the U.S. population and conduct the same analysis.
+
+# References
+
+Jones, Jeffery. “U.S. Church Membership Falls below Majority for First Time.” Gallup, 29 Mar. 2021, news.gallup.com/poll/341963/church-membership-falls-below-majority-first-time.aspx.
+
+Diez, David, et al. OpenIntro Statistics. Fourth ed., OpenIntro, 8 June 2019.
