@@ -1,0 +1,466 @@
+---
+title: "test_codes"
+author: "Alex Ptacek"
+date: "2025-05-30"
+output: html_document
+editor_options: 
+  chunk_output_type: console
+---
+
+Notes:
+
+1. Any studies/reports on relationship between psychology and behavior?
+
+2. Best way to utilize responses from multiple related questions to calculate and overall score?
+
+3. Part 2 of project could be an analysis of certain attitudes (science/tech, religion, economy) vs. GDP of countries, using the top vs. mid vs. low GDP countries.
+
+4. Last completed country was India (2023)
+
+
+
+```{r}
+data1 <- read.spss("Dataset.sav", to.data.frame = TRUE)
+data2 <- read.spss('data_npors.sav', to.data.frame = TRUE)
+
+```
+
+```{r}
+us_econ_religion |> 
+  count(econ_outlook) |> 
+  mutate(group = case_when(econ_outlook < 5 ~ "negative",
+                           econ_outlook > 5 ~ "positive",
+                           econ_outlook == 5 ~ NA,
+                           .default = as.character(econ_outlook))) |> 
+  group_by(group) |> 
+  summarise(tot = sum(n))
+```
+
+################################################################################
+
+# What I want to do 
+
+Analyze effects of science and economic outlook on religion.
+
+Combine religious variable into one response variable
+- find most correlated responses in religious variable
+- 
+
+
+# Data
+
+This report uses data from WVS and NPORS
+
+```{r}
+wvs_survey <- read_csv("wvs_survey.csv") |> 
+  clean_names()
+```
+
+
+
+# Libraries
+
+```{r}
+library(tidyverse)
+library(janitor)
+library(foreign)
+library(GGally)
+library(ggpubr)
+library(infer)
+library(stats)
+
+library(psych)
+```
+
+
+# Data Tidying
+
+In this section, I select a range of questions and add category names to them based on the questionnaire guide on the WVS website. I confirmed there were no null values, because for every variable there either shouldn't be null values or they are encoded as negative numbers. I am also removing `q172r` because it is less granular version of `q172` that is recoded post-survey. Lastly, I recoded the negative values for the questions as NA, so the data will be easier to work with later on.
+
+```{r message=FALSE}
+wvs_data <- wvs_survey |> 
+  filter(b_country == 840) |>   #US Country Code
+  select(a_year, b_country, b_country_alpha, j_intdate, k_time_start, k_time_end,
+         q_mode, g_townsize, h_settlement, h_urbrural,
+         e1_literacy, q1:q50, q158:q163, q164:q175, q260:q290) |> 
+  select(-q172r) |> 
+  rename_with(~str_c(., "_social"), q1:q50) |> 
+  rename_with(~str_c(., "_sci_tech"), q158:q163) |>
+  rename_with(~str_c(., "_religion"), q164:q175) |>
+  rename_with(~str_c(., "_demographic"), q260:q290)
+
+wvs_data |> 
+  filter(if_any(everything(), is.na)) |> 
+  count()
+
+wvs_data <- wvs_data |> 
+  mutate(across(4:126, \(x) ifelse(x < 0, NA, x)))
+
+```
+
+
+# Exploratory Data Analysis
+
+### Checking for Missing Values
+
+Overall, about 5% of data is missing, on average.
+
+100% of `e1_literacy` is missing. We can drop this variable.
+
+Most missingness is coming from demographic questions, time of interview, and townsize.
+
+q18-q26 are missing for the same respondents at 6.2% overall.
+
+For each religion variable, less than 3% is missing. We can drop missing values.
+
+```{r}
+sum(is.na(wvs_data))/   #total missing values
+  (2596*131)            #total values in data
+
+
+#Religion Missingness
+wvs_data |> 
+  select(q164_religion:q175_religion) |> 
+  summarise(across(everything(), \(x) sum(is.na(x)))) |> 
+  pivot_longer(cols = everything(), names_to = "variable", values_to = "na_counts") |> 
+  mutate(na_ratio = na_counts/2596) |> 
+  arrange(desc(na_ratio))
+
+#Overall Missingness
+wvs_data |> 
+  summarise(across(everything(), \(x) sum(is.na(x)))) |> 
+  pivot_longer(cols = everything(), names_to = "variable", values_to = "na_counts") |> 
+  mutate(na_ratio = na_counts/2596) |> 
+  arrange(desc(na_ratio)) |> 
+  view()
+```
+
+
+### Remove Missing Values
+
+```{r}
+wvs_data <- wvs_data |> 
+  select(-e1_literacy) |> 
+  drop_na(q164_religion:q175_religion)
+```
+
+
+
+### Tidying Religion Section
+
+Before we can model the relationships between various opinions and religion, we need to align the directionality of responses. My preference is to have stronger affinity for a respective opinion represented by an increase in score. These transformations will have to be done on a question-by-question basis.
+
+
+
+```{r}
+wvs_data <- wvs_data |> 
+  mutate(across(q165_religion:q168_religion, \(x) x = 3-x),
+         across(q169_religion:q170_religion, \(x) x = 5-x),
+         q171_religion = 8 - q171_religion,
+         q172_religion = 9 - q172_religion,
+         q173_religion = 4 - q173_religion)
+
+
+
+```
+
+
+### Analyze Distributions
+
+```{r}
+relig_vars <- wvs_data |> select(q164_religion:q175_religion)
+relig_dist <- map(names(relig_vars), ~ {
+  ggplot(relig_vars, aes(x = .data[[.x]])) +
+    geom_bar()
+})
+
+ggarrange(plotlist = relig_dist)
+```
+
+
+
+# Modeling "Religiosity"
+
+The WVS survey provides a section of questions that gauges respondents' affinity for religion, but none of the questions alone can capture the full relationship that a respondent has with religion. However, by combining the items into a single "religiosity" score, we can determine a more holistic strength of a respondent's religious affinity.
+
+First, it is important to test that the religious questions are indeed related (i.e. they are measuring the same thing). We can do this using Cronbach's alpha for measuring internal consistency. Cronbach's alpha summarizes the correlations across several related variables. If all of the variables are highly correlated (which we expect of questions in the same survey section), then the alpha will be high, as well. In particular, we will be looking at the standardized alpha which is based upon correlations, rather than covariances, and is therefore better suited for variables on different scales. I will also be paying close attention to questions 174 and 175. These questions (reiterated below) question the respondent's understanding of their religion versus measuring the strength of their beliefs. Accordingly, it was difficult to assess the directionality of the responses, and I am expected them to have low correlation with the other religious questions.
+
+Q174: With which one of the following statements do you agree most? The basic meaning of religion is:
+1. To follow religious norms and ceremonies 2. To do good to other people
+
+Q175: And with which of the following statements do you agree most? The basic meaning of religion is:
+1. To make sense of life after death 2. To make sense of life in this world 
+
+```{r}
+alpha(wvs_data |> select(q164_religion:q175_religion), discrete = FALSE)
+```
+
+
+Upon analysis of our `psych:alpha()` output, we have an acceptably high `std.alpha` of 0.89. The output also provides us with `r.drop` scores for each of our items, which shows the correlation of each variable against the total correlation without that variable. As expected, questions 174 and 175 have low correlation with the total correlation of the other variables and is bringing down the `std.alpha`. Therefore, it makes sense to exclude these items from our religiosity score.
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
