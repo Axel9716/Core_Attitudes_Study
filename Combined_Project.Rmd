@@ -75,7 +75,7 @@ library(psych)
 
 # Data Tidying
 
-In this section, I select a range of questions and add category names to them based on the questionnaire guide on the WVS website. I confirmed there were no null values, because for every variable there either shouldn't be null values or they are encoded as negative numbers. I am also removing `q172r` because it is less granular version of `q172` that is recoded post-survey. Lastly, I recoded the negative values for the questions as NA, so the data will be easier to work with later on.
+In this section, I select a range of questions and add category names to them based on the questionnaire guide on the WVS website. I confirmed there were no null values, because for every variable there either shouldn't be null values or they are encoded as negative numbers. I am also removing `q172r` because it is a less granular version of `q172` that is recoded post-survey. Lastly, I recoded the negative values for the questions as NA, so the data will be easier to work with later on.
 
 ```{r message=FALSE}
 wvs_data <- wvs_survey |> 
@@ -115,7 +115,7 @@ For each religion variable, less than 3% is missing. We can drop missing values.
 
 ```{r}
 sum(is.na(wvs_data))/   #total missing values
-  (2596*131)            #total values in data
+  (2596*130)            #total values in data
 
 
 #Religion Missingness
@@ -175,6 +175,11 @@ relig_dist <- map(names(relig_vars), ~ {
 })
 
 ggarrange(plotlist = relig_dist)
+```
+
+
+```{r}
+ggpairs(relig_vars)
 ```
 
 
