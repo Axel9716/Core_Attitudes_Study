@@ -4,13 +4,11 @@ author: "Alex Ptacek"
 output:
   html_document: default
   pdf_document: default
-editor_options:
-  chunk_output_type: console
 ---
 
 # Abstract
 
-Over the last century, the world has experienced a technological boom, which increasingly permeates our everyday life. Relentless strides in the fields of science have given us insight into our nature and the workings of the universe. In a similar period of time, the U.S. has also experienced a 36% decline in religious participation (mostly over the last two decades), based on Gallup surveys between 1937 and 2020. Clergy leaders should understand what factors are impacting this decline, if they wish to rebuild membership. In this report, I use survey response data from the World Value Survey (WVS) to analyze the relationship between approval of science and technology and affiliation with religion. I use two questions from the WVS data as a proxy for these affinities, which effectively ask: "If developments in science/technology change our way of life, would that be good or bad?" and "Do you consider yourself religious". The groups are simply labelled: {science: "good", "bad"; religious: "yes", "no"}. Within the "science bad" group, 61% are religious, and in the "science good" group, 52% are religious. I used the `infer` package to generate a sampling distribution of two proportions and conduct a 2-proportion z-test, with the significance level for the null hypothesis set at 0.05. I have calculated the p-value to be 0.036, which is less than our significance level, so we reject the null hypothesis. This finding provides evidence that clergy leaders will likely have more success building religious membership in communities with less approval of science/technology. Furthermore, I would recommend clergy leaders improve religious membership in communities with higher science/technology approval, by educating communities on the positive influences religion and science/technology have had on each other throughout history, to increase religious relevance in a constantly evolving technological world.
+Over the last two decades, the U.S has experienced a 36% decline in religious participation, based on Gallup surveys. In a similar period of time, the U.S. has experienced other nation-wide phenomena, including the advent of cell phones and social media, which increasingly permeates our everyday life. Clergy leaders should understand what factors are impacting the decline in religious participation, if they wish to rebuild membership. In this report, I use survey response data from the World Values Survey (WVS) to analyze the approval of science and technology, economic outlook, and their association with religion. I use two questions from the WVS data as a proxy for these affinities, which effectively ask: **"If developments in science/technology change our way of life, would that be good or bad?"**, **"How do you rate the economy?"**, and **"Do you consider yourself religious"**. The groups are simply labelled: **{science: "good", "bad"}**, **{economy: "positive", "negative"}**, and **religious: "yes", "no"}**. Within the *"science bad"* group, 61% are religious, and in the *"science good"* group, 52% are religious. I used the `infer` package to generate sampling distributions of two proportions and conduct 2-proportion z-tests, with the significance level for the null hypotheses set at 0.05. The test for religion and science/technology resulted in a p-value of 0.036, which is less than our significance level, so we reject the null hypothesis. The test for religion and economic outlook generated a p-value of 0.986, so we fail to reject the null. These findings provides evidence that clergy leaders will likely have more success building religious membership in communities with less approval of science/technology. Whereas, targeting communities based on economic factors may not sway the likelihood of success. Furthermore, I would recommend clergy leaders improve religious membership in communities with higher science/technology approval, by educating communities on the positive influences religion and science/technology have had on each other throughout history, to increase religious relevance in a constantly evolving technological world.
 
 
 # Introduction
@@ -18,6 +16,10 @@ Over the last century, the world has experienced a technological boom, which inc
 The motivation for the project comes from an interest in the decline rates of religious participation in the U.S. As someone who was raised Catholic in the 21st century, I have seen firsthand the decrease in church attendance and the macro political shift away from religious influence over the past 20+ years. Gallup has measured U.S membership of any religious institution since 1937, and the percentage has remained around 70%, until the turn of the 21st century, and last measured at 47% in 2020. Gallup reports that the decline in religious membership between 2000 to 2020 is similar across all religions, with steeper declines seen among Catholics. However, they attribute most of the decline to overall decline in religious affiliation (less affiliation to a religion, less membership to a religious institution). My goal in this study is to attribute further causation to this religious decline, and my first target is science/technology. The world has experienced other phenomena over the past century (i.e. massive increases in the middle-class and globalization), but based on personal experience, I believe progress made in the fields of science has contributed most significantly; archaeological discoveries have contradicted historical claims of the church, and ease-of-access to technologies which promise to make our lives better deter people from values of humility often preached by religious figures. 
 
 The U.S. has experienced a tremendous decline in religious participation, from 73% in 1973 to 47% in 2020, based on a Gallup report. I chose the WVS and NPORs surveys because these were conducted by huge research organizations with large enough sample sizes for the desired analysis, and the breadth of question topics is also wide-ranging. My approach to analyzing the data was make it easier to work with, examine the descriptive statistics, then apply the appropriate model. To make the data easier to work with, I categorized many of the questions, reencoded null values, selected the variables of interest, and dichotomized our key variables. The exploratory data analysis provided insight into the distribution of our key variables and helped with the recoding. Since the goal is to assess the statistical significance of any difference in the proportions of two groups, it makes sense to use a 2-proportion z-test.
+
+
+![*Church Membership from 1937 - 2020, Gallup*](gallup_trend.png)
+
 
 # Load Packages
 
@@ -28,11 +30,21 @@ library(ggpubr)
 library(infer)
 ```
 
-# Read Data
+# About the Data - WVS Wave 7
+
+The data used for this project comes from Wave 7 of the World Values Survey. The data and its documentation can be found in a variety of formats through the following link:
+
+[WVS Wave 7](https://www.worldvaluessurvey.org/WVSDocumentationWV7.jsp)
+
+More about the data.
+
 
 ```{r message=FALSE}
 wvs_survey <- read_csv("wvs_survey.csv")
+```
 
+
+```{r}
 #Checking for null values in country column
 wvs_survey |> 
   filter(is.na(B_COUNTRY))

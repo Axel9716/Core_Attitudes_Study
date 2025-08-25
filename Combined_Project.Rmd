@@ -57,7 +57,6 @@ wvs_survey <- read_csv("wvs_survey.csv") |>
 ```
 
 
-
 # Libraries
 
 ```{r}
