@@ -62,7 +62,11 @@ data <- wvs_survey |>
          religion = Q173)            #proxy for religious affiliation
 ```
 
+<br><br><br>
 
+Next, I nee
+
+```{r}
 wvs_data |> 
   filter(if_any(everything(), is.na)) |> 
   count()
