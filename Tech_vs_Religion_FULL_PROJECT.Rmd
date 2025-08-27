@@ -2,8 +2,8 @@
 title: "The Effects of Scientific Development of Religious Participation"
 author: "Alex Ptacek"
 output:
-  html_document: default
   pdf_document: default
+  html_document: default
 ---
 
 # Abstract
@@ -62,9 +62,7 @@ wvs_data <- wvs_survey |>
          religion = Q173)            #proxy for religious affiliation
 ```
 
-\newline
-\newline
-\newline
+<br><br><br><br><br>
 
 Next, I nee
 
