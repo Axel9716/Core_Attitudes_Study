@@ -2,8 +2,8 @@
 title: "The Effects of Scientific Development of Religious Participation"
 author: "Alex Ptacek"
 output:
-  html_document: default
   pdf_document: default
+  html_document: default
 ---
 
 # Abstract
@@ -54,7 +54,7 @@ First, I am filtering to only respondents in the U.S. and selecting our target v
 
 ```{r message=FALSE}
 # Select data of interest
-data <- wvs_survey |>     
+wvs_data <- wvs_survey |>     
   filter(B_COUNTRY == 840) |>        #U.S. country code
   select(Q44, Q50, Q173) |> 
   rename(science = Q44,              #proxy for science approval
@@ -71,8 +71,8 @@ wvs_data |>
   filter(if_any(everything(), is.na)) |> 
   count()
 
-wvs_data <- wvs_data |> 
-  mutate(across(4:126, \(x) ifelse(x < 0, NA, x)))
+#wvs_data <- wvs_data |> 
+ # mutate(across(4:126, \(x) ifelse(x < 0, NA, x)))
 
 ```
 
