@@ -40,7 +40,7 @@ More about the data.
 
 
 ```{r message=FALSE}
-wvs_survey <- read_csv("wvs_survey.csv") |> clean_names()
+wvs_survey <- read_csv("wvs_survey.csv")
 ```
 
 
@@ -50,17 +50,18 @@ wvs_survey <- read_csv("wvs_survey.csv") |> clean_names()
 
 In this section, I select a range of questions and add category names to them based on the questionnaire guide on the WVS website. I confirmed there were no null values, because for every variable there either shouldn't be null values or they are encoded as negative numbers. I am also removing `q172r` because it is a less granular version of `q172` that is recoded post-survey. Lastly, I recoded the negative values for the questions as NA, so the data will be easier to work with later on.
 
+First, I am filtering to only respondents in the U.S. and selecting our target variables.
+
 ```{r message=FALSE}
-wvs_data <- wvs_survey |> 
-  filter(b_country == 840) |>   #US Country Code
-  select(a_year, b_country, b_country_alpha, j_intdate, k_time_start, k_time_end,
-         q_mode, g_townsize, h_settlement, h_urbrural,
-         e1_literacy, q1:q50, q158:q163, q164:q175, q260:q290) |> 
-  select(-q172r) |> 
-  rename_with(~str_c(., "_social"), q1:q50) |> 
-  rename_with(~str_c(., "_sci_tech"), q158:q163) |>
-  rename_with(~str_c(., "_religion"), q164:q175) |>
-  rename_with(~str_c(., "_demographic"), q260:q290)
+# Select data of interest
+data <- wvs_survey |>     
+  filter(B_COUNTRY == 840) |>        #U.S. country code
+  select(Q44, Q50, Q173) |> 
+  rename(science = Q44,              #proxy for science approval
+         econ_outlook = Q50,         #proxy for economic outlook
+         religion = Q173)            #proxy for religious affiliation
+```
+
 
 wvs_data |> 
   filter(if_any(everything(), is.na)) |> 
