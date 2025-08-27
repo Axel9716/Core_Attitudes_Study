@@ -62,7 +62,8 @@ wvs_data <- wvs_survey |>
          religion = Q173)            #proxy for religious affiliation
 ```
 
-<br><br><br><br><br>
+<br><br><br>
+\vspace{5cm}
 
 Next, I nee
 
