@@ -65,15 +65,15 @@ wvs_data <- wvs_survey |>
 <br><br>
 \vspace{1cm}
 
-Next, I need
+Next, I verify that there are no null values. No variable in this dataset should be null, because they are encoded as negative numbers. I also want to first recode the null values (stored as negatives) into 0's 
 
 ```{r}
 wvs_data |> 
   filter(if_any(everything(), is.na)) |> 
   count()
 
-#wvs_data <- wvs_data |> 
- # mutate(across(4:126, \(x) ifelse(x < 0, NA, x)))
+wvs_data <- wvs_data |> 
+ mutate(across(4:126, \(x) ifelse(x < 0, 0, x)))
 
 ```
 
