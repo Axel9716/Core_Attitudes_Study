@@ -4,6 +4,8 @@ author: "Alex Ptacek"
 output:
   html_document: default
   pdf_document: default
+editor_options: 
+  chunk_output_type: inline
 ---
 
 # Abstract
@@ -28,6 +30,9 @@ library(tidyverse)
 library(stats)
 library(ggpubr)
 library(infer)
+library(janitor)
+library(knitr)
+library(kableExtra)
 ```
 
 # About the Data - WVS Wave 7
@@ -65,7 +70,7 @@ wvs_data <- wvs_survey |>
 <br><br>
 \vspace{1cm}
 
-Next, I verify that there are no null values. No variable in this dataset should be null, because they are encoded as negative numbers. I also want to first recode the null values (stored as negatives) into 0's 
+Next, I verify that there are no null values. No variable in this dataset should be null, because they are encoded as negative numbers. I also want to recode the null values (stored as negatives) into 0's to help visualize missing values, at first, before deciding what to do with them
 
 ```{r}
 wvs_data |> 
@@ -73,9 +78,26 @@ wvs_data |>
   count()
 
 wvs_data <- wvs_data |> 
- mutate(across(4:126, \(x) ifelse(x < 0, 0, x)))
+ mutate(across(everything(), \(x) ifelse(x < 0, 0, x)))
 
 ```
+
+### Dealing with Missing Values
+
+
+
+```{r}
+wvs_data |> tabyl(science, religion) |> 
+  adorn_totals(c("row", "col")) %>%
+  adorn_percentages("row") %>% 
+  adorn_pct_formatting(rounding = "half up", digits = 0) %>%
+  adorn_ns() %>%
+  adorn_title("combined") |> 
+  kable() |> 
+  kable_styling(bootstrap_options = "striped")
+```
+
+
 
 # Clean Data
 
