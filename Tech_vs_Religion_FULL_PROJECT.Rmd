@@ -82,19 +82,25 @@ wvs_data <- wvs_data |>
 
 # Exploring Distrubtions and Proportions
 
-All our variables are in likert format, with four to eleven options (including NAs). The goal of this analysis is to segment respondents into one of two classes, and we can use the distributions and proportions of responses, as well as the wording of the questions themselves, as a heuristic for choosing the segmentation threshhold for the responses within each question:
+All our variables are in likert format, with four to eleven options (including NAs). The goal of this analysis is to segment respondents into one of two classes, and we can use the distributions and proportions of responses, as well as the wording of the questions themselves, as a heuristic for choosing the segmentation threshold for the responses within each question:
 
-Science: More emphasis on the development of technology will be...
+Science: More emphasis on the development of technology will be...?
             1. Good
             2. Don't Mind
             3. Bad
             
-Economic Outlook: 
+Economic Outlook: How satisfied are you with the financial situation (Scale 1 - 10)?
+            1. Completely dissatisfied
+            ...
+            10. Completely satisfied
+
+Religion: Would you say you are...?
+            1. A religious person
+            2. Not a religious person
+            3. An atheist
             
-    
-
-
-
+The distributions below show that most people surveyed think technological development is good, have a more positive economic outlook, and are religious. There is also a noticeably small portion of those who are atheist or who believe tech development is bad. We also have very few NA values. 
+            
 ```{r}
 hist_plots <- map(names(wvs_data), ~ {
   ggplot(wvs_data, aes(x = .data[[.x]])) +
