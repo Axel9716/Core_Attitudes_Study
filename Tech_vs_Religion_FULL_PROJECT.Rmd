@@ -80,9 +80,9 @@ wvs_data <- wvs_data |>
 
 ```
 
-# Exploring Distrubtions and Proportions
+# Exploring Distrubtions and Segmenting Respondents
 
-All our variables are in likert format, with four to eleven options (including NAs). The goal of this analysis is to segment respondents into one of two classes, and we can use the distributions and proportions of responses, as well as the wording of the questions themselves, as a heuristic for choosing the segmentation threshold for the responses within each question:
+All our variables are in likert format, with four to eleven options (including NAs). The goal of this analysis is to segment respondents into one of two classes, and we can use the distributions of responses, as well as the wording of the questions and response choices, as a heuristic for choosing the segmentation threshold for the responses within each question:
 
 Science: More emphasis on the development of technology will be...?
             1. Good
@@ -99,9 +99,15 @@ Religion: Would you say you are...?
             2. Not a religious person
             3. An atheist
             
-The distributions below show that most people surveyed think technological development is good, have a more positive economic outlook, and are religious. There is also a noticeably small portion of those who are atheist or who believe tech development is bad. We also have very few NA values. 
+The distributions below show that most people surveyed think technological development is good, have a more positive economic outlook, and are religious. There is also a noticeably small portion of those who are atheist or who believe tech development is bad. 
+
+Within `science`, the "Don't Mind" (2) response is completely neutral, and therefore gives us no information regarding our central question in this study - are approval/disapproval of tech development independent of religious affinity? I will remove this data, in order to focus the test on the religious affinity between science approvers (1) and the apparently fringe disapprovers (3).
+
+The `econ_outlook` variable is on a 10-point likert scale. There is little evidence to prove that 10-point scales effectively relate to human subjective scales, and are instead heavily dependent on format (citation). 
+
+The responses for `religion`
             
-```{r}
+```{r echo=FALSE}
 hist_plots <- map(names(wvs_data), ~ {
   ggplot(wvs_data, aes(x = .data[[.x]])) +
     geom_bar() +
@@ -117,13 +123,33 @@ hist_plots <- map(names(wvs_data), ~ {
 ggarrange(plotlist = hist_plots)
 ```
 
+**Economic Outlook Median Response**
+
+```{r}
+wvs_data |> 
+  filter(econ_outlook != 0) |> 
+  pull(econ_outlook) |> 
+  median()
+```
+
 
 
 ### Dealing with Missing Values
 
 
 ```{r}
-wvs_data |> tabyl(science, religion) |> 
+wvs_data |> tabyl(science, religion) |>  
+  adorn_totals(c("row", "col")) |> 
+  adorn_percentages("row") |> 
+  adorn_pct_formatting(rounding = "half up", digits = 0) |> 
+  adorn_ns() |> 
+  adorn_title() |> 
+  kable() |> 
+  kable_styling(bootstrap_options = "striped")
+```
+
+```{r}
+wvs_data |> tabyl(econ_outlook, religion) |>  
   adorn_totals(c("row", "col")) %>%
   adorn_percentages("all") %>% 
   adorn_pct_formatting(rounding = "half up", digits = 0) %>%
