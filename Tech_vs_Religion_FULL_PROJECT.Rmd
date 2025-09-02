@@ -99,13 +99,6 @@ Religion: Would you say you are...?
             2. Not a religious person
             3. An atheist
             
-The distributions below show that most people surveyed think technological development is good, have a more positive economic outlook, and are religious. There is also a noticeably small portion of those who are atheist or who believe tech development is bad. 
-
-Within `science`, the "Don't Mind" (2) response is completely neutral, and therefore gives us no information regarding our central question in this study - are approval/disapproval of tech development independent of religious affinity? I will remove this data, in order to focus the test on the religious affinity between science approvers (1) and the apparently fringe disapprovers (3).
-
-The `econ_outlook` variable is on a 10-point likert scale. There is little evidence to prove that 10-point scales effectively relate to human subjective scales, and are instead heavily dependent on format (citation). 
-
-The responses for `religion`
             
 ```{r echo=FALSE}
 hist_plots <- map(names(wvs_data), ~ {
@@ -123,24 +116,86 @@ hist_plots <- map(names(wvs_data), ~ {
 ggarrange(plotlist = hist_plots)
 ```
 
+The distributions above show that most people surveyed think technological development is good, have a more positive economic outlook, and are religious. There is also a noticeably small portion of those who are atheist or who believe tech development is bad. 
+
+Within `science`, the "Don't Mind" (2) response is completely neutral, and therefore gives us no information regarding our central question in this study - are approval/disapproval of tech development independent of religious affinity? I will remove this data, in order to focus the test on the religious affinity between science approvers (1) and the apparently fringe disapprovers (3). I will simply code these responses as "good" (1) and "bad" (2).
+
+```{r echo=FALSE}
+wvs_data <- wvs_data |> 
+  mutate(science = as.character(science),
+         science = case_when(science == 1 ~ "good",
+                             science == 2 ~ NA,
+                             science == 3 ~ "bad",
+                             .default = science))
+```
+
+
+The `econ_outlook` variable is on a 10-point likert scale. There is little evidence to prove that 10-point scales effectively relate to human subjective scales, and are instead heavily dependent on format (citation). This means that, even though we may assume that 5 should be 'average', people may collectively agree on a different average. I believe this phenomenon is present in this data, based on the left-skewed distribution of responses, and especially due to the questionnaire not labeling any of the response numbers, except for 1 and 10. We can instead use the median response to get the most even split of the data (shown below), then label those above in the upper 50 percentile (greater than 6) as having a "positive" economic outlook and those in the lower 50 percentile as having a "negative" outlook.
+
 **Economic Outlook Median Response**
 
-```{r}
+```{r echo=FALSE}
 wvs_data |> 
   filter(econ_outlook != 0) |> 
   pull(econ_outlook) |> 
   median()
 ```
 
+**Economic Outlook Segmentation Portions**
+
+```{r echo=FALSE}
+wvs_data |> 
+  filter(econ_outlook > 0 & econ_outlook <= 6) |> 
+  count(econ_outlook) |> 
+  mutate(econ_1_to_6 = sum(n)) |> 
+  select(econ_1_to_6) |> 
+  distinct() |> 
+  mutate(perc_of_total = round(econ_1_to_6 / 2573, 2))
+
+wvs_data |> 
+  filter(econ_outlook > 6) |> 
+  count(econ_outlook) |> 
+  mutate(econ_7_to_10 = sum(n)) |> 
+  select(econ_7_to_10) |> 
+  distinct() |> 
+  mutate(perc_of_total = round(econ_7_to_10 / 2573, 2))
+```
+
+```{r echo=FALSE}
+#coding econ_outlook
+wvs_data <- wvs_data |> 
+  mutate(econ_outlook = as.character(econ_outlook),
+         econ_outlook = case_when(as.numeric(econ_outlook) > 0 &
+                                    as.numeric(econ_outlook) <= 6 ~ "negative",
+                                  
+                                  as.numeric(econ_outlook) > 6 ~ "positive",
+                                  
+                                  .default = econ_outlook))
+```
 
 
-### Dealing with Missing Values
+The groups I am testing for `religion` are religious versus non-religious. Choice 1 will be "yes religious", while choices 2 and 3 will be "not religious", because those who chose 2 and 3 are both non-religious groups, just to different degrees. To make labels more simple, they will be coded as "yes" and "no". 
+
+```{r}
+wvs_data <- wvs_data |> 
+  mutate(religion = as.character(religion),
+         religion = case_when(religion == 1 ~ "yes",
+                              religion == 2 ~ "no",
+                              religion == 3 ~ "no",
+                              .default = religion))
+```
+
+
+
+### Exploring proportions
 
 
 ```{r}
-wvs_data |> tabyl(science, religion) |>  
+wvs_data |> 
+  drop_na() |> 
+  tabyl(science, religion) |>  
   adorn_totals(c("row", "col")) |> 
-  adorn_percentages("row") |> 
+  adorn_percentages("all") |> 
   adorn_pct_formatting(rounding = "half up", digits = 0) |> 
   adorn_ns() |> 
   adorn_title() |> 
@@ -149,52 +204,18 @@ wvs_data |> tabyl(science, religion) |>
 ```
 
 ```{r}
-wvs_data |> tabyl(econ_outlook, religion) |>  
-  adorn_totals(c("row", "col")) %>%
-  adorn_percentages("all") %>% 
-  adorn_pct_formatting(rounding = "half up", digits = 0) %>%
-  adorn_ns() %>%
+wvs_data |> 
+  tabyl(econ_outlook, religion) |>  
+  adorn_totals(c("row", "col")) |> 
+  adorn_percentages("all") |> 
+  adorn_pct_formatting(rounding = "half up", digits = 0) |> 
+  adorn_ns() |> 
   adorn_title() |> 
   kable() |> 
   kable_styling(bootstrap_options = "striped")
 ```
 
 
-
-# Clean Data
-
-```{r}
-#Minimize dataset so it's faster
-us_sci_religion <- wvs_survey |>     
-  filter(B_COUNTRY == 840) |>        #U.S. country code
-  select(Q44, Q173) |> 
-  rename(science = Q44,              #proxy for science approval
-         religion = Q173)            #proxy for religious affiliation
-
-#Observe values in science column
-us_sci_religion |> 
-  count(science)
-
-#Observe values in religion column
-us_sci_religion |> 
-  count(religion)
-
-#Recode neutral and null responses to NA
-us_sci_religion <- us_sci_religion |> 
-  mutate(science = as.character(science),
-         science = case_when(science == -2 ~ NA,
-                             science == -1 ~ NA,
-                             science == 1 ~ "good",
-                             science == 2 ~ NA,
-                             science == 3 ~ "bad",
-                             .default = science),
-         religion = as.character(religion),
-         religion = case_when(religion == -2 ~ NA,
-                              religion ==1 ~ "yes",
-                              religion == 2 ~ "no",
-                              religion == 3 ~ "no",
-                              .default = religion))
-```
 
 # Summary Statistics
 
