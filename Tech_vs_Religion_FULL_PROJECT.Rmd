@@ -39,7 +39,7 @@ library(kableExtra)
 
 The data used for this project comes from Wave 7 of the World Values Survey. The data and its documentation can be found in a variety of formats through the following link:
 
-[WVS Wave 7](https://www.worldvaluessurvey.org/WVSDocumentationWV7.jsp)
+[World Values Survey Wave 7](https://www.worldvaluessurvey.org/WVSDocumentationWV7.jsp)
 
 More about the data.
 
@@ -53,9 +53,7 @@ wvs_survey <- read_csv("wvs_survey.csv")
 
 **The WVS data requires a bit of processing before we can begin analysis.**
 
-In this section, I select a range of questions and add category names to them based on the questionnaire guide on the WVS website. I confirmed there were no null values, because for every variable there either shouldn't be null values or they are encoded as negative numbers. I am also removing `q172r` because it is a less granular version of `q172` that is recoded post-survey. Lastly, I recoded the negative values for the questions as NA, so the data will be easier to work with later on.
-
-First, I am filtering to only respondents in the U.S. and selecting our target variables.
+First, I am filtering to only respondents in the U.S. and selecting our target proxy variables.
 
 ```{r message=FALSE}
 # Select data of interest
@@ -82,17 +80,49 @@ wvs_data <- wvs_data |>
 
 ```
 
-### Dealing with Missing Values
+# Exploring Distrubtions and Proportions
 
+All our variables are in likert format, with four to eleven options (including NAs). The goal of this analysis is to segment respondents into one of two classes, and we can use the distributions and proportions of responses, as well as the wording of the questions themselves, as a heuristic for choosing the segmentation threshhold for the responses within each question:
+
+Science: More emphasis on the development of technology will be...
+            1. Good
+            2. Don't Mind
+            3. Bad
+            
+Economic Outlook: 
+            
+    
+
+
+
+```{r}
+hist_plots <- map(names(wvs_data), ~ {
+  ggplot(wvs_data, aes(x = .data[[.x]])) +
+    geom_bar() +
+    scale_x_continuous(
+      breaks = seq(
+        from = min(wvs_data[[.x]], na.rm = TRUE),
+        to   = max(wvs_data[[.x]], na.rm = TRUE),
+        by   = 1)) +
+    ylab("") +
+    theme_minimal()
+})
+
+ggarrange(plotlist = hist_plots)
+```
+
+
+
+### Dealing with Missing Values
 
 
 ```{r}
 wvs_data |> tabyl(science, religion) |> 
   adorn_totals(c("row", "col")) %>%
-  adorn_percentages("row") %>% 
+  adorn_percentages("all") %>% 
   adorn_pct_formatting(rounding = "half up", digits = 0) %>%
   adorn_ns() %>%
-  adorn_title("combined") |> 
+  adorn_title() |> 
   kable() |> 
   kable_styling(bootstrap_options = "striped")
 ```
